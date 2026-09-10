@@ -1,0 +1,14 @@
+{
+  "name": "vizgen",
+  "version": "1.0.0",
+  "description": "VizGen - AI Agent 驱动的数据看板生成工厂",
+  "private": true,
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.22.2",
+    "playwright-core": "^1.63.0"
+  }
+}

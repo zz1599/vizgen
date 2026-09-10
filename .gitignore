@@ -1,0 +1,7 @@
+node_modules/
+data/
+*.ndjson
+cj*.txt
+out.json
+me.json
+projects.json

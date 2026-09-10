@@ -1,6 +1,20 @@
 // VizGen 服务器入口
 'use strict';
 
+// 零依赖 .env 加载（KEY=VALUE，# 注释），必须在其他模块 require 之前
+(() => {
+  try {
+    const fs0 = require('node:fs');
+    const path0 = require('node:path');
+    const envPath = path0.join(__dirname, '.env');
+    if (!fs0.existsSync(envPath)) return;
+    for (const line of fs0.readFileSync(envPath, 'utf8').split(/\r?\n/)) {
+      const m = line.match(/^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)\s*$/);
+      if (m && !(m[1] in process.env)) process.env[m[1]] = m[2].replace(/^["']|["']$/g, '');
+    }
+  } catch (e) { console.warn('[env] .env 加载失败:', e.message); }
+})();
+
 const express = require('express');
 const path = require('node:path');
 const fs = require('node:fs');

@@ -79,8 +79,9 @@ app.get('/api/projects', authLib.requireAuth, (req, res) => {
 
 app.post('/api/projects', authLib.requireAuth, (req, res) => {
   const name = String((req.body && req.body.name) || '').trim() || '未命名项目';
-  const r = db.prepare('INSERT INTO projects(user_id, name) VALUES (?, ?)').run(req.user.uid, name);
-  res.json({ id: Number(r.lastInsertRowid), name });
+  const kind = (req.body && req.body.kind === 'app') ? 'app' : 'dashboard';
+  const r = db.prepare('INSERT INTO projects(user_id, name, kind) VALUES (?, ?, ?)').run(req.user.uid, name, kind);
+  res.json({ id: Number(r.lastInsertRowid), name, kind });
 });
 
 function getOwnedProject(req, res) {
@@ -98,9 +99,11 @@ app.get('/api/projects/:id', authLib.requireAuth, (req, res) => {
     .map(m => ({ id: m.id, role: m.role, created_at: m.created_at, ...JSON.parse(m.content_json) }));
   res.json({
     project: p,
+    kind: p.kind === 'app' ? 'app' : 'dashboard',
     dataset: dataset ? { id: dataset.id, name: dataset.name, columns: JSON.parse(dataset.columns_json), rowCount: dataset.row_count } : null,
     versions,
     latestVersionId: latest ? latest.id : null,
+    latestKind: latest ? (latest.kind === 'app' ? 'app' : 'dashboard') : null,
     latestConfig: latest ? JSON.parse(latest.config_json) : null,
     messages,
   });
@@ -129,20 +132,23 @@ app.post('/api/projects/:id/data', authLib.requireAuth, (req, res) => {
   res.json({ datasetId: Number(r.lastInsertRowid), name: dataset.name, columns: dataset.columns, rowCount: dataset.rowCount });
 });
 
-// ---------- generate（NDJSON 流式 Agent）----------
+// ---------- generate（NDJSON 流式 Agent，双模式：数据看板 / 通用应用）----------
 app.post('/api/projects/:id/generate', authLib.requireAuth, async (req, res) => {
   const p = getOwnedProject(req, res); if (!p) return;
   const message = String((req.body && req.body.message) || '').trim();
   if (!message) return res.status(400).json({ error: '消息不能为空' });
 
+  const projectKind = p.kind === 'app' ? 'app' : 'dashboard';
   const datasetRow = db.prepare('SELECT * FROM datasets WHERE project_id = ? ORDER BY id DESC LIMIT 1').get(p.id);
-  if (!datasetRow) return res.status(400).json({ error: '请先导入数据' });
-  const dataset = {
+
+  if (projectKind === 'dashboard' && !datasetRow) return res.status(400).json({ error: '请先导入数据' });
+
+  const dataset = datasetRow ? {
     name: datasetRow.name,
     columns: JSON.parse(datasetRow.columns_json),
     rows: JSON.parse(datasetRow.rows_json),
     rowCount: datasetRow.row_count,
-  };
+  } : null;
   const currentVersion = db.prepare('SELECT * FROM versions WHERE project_id = ? ORDER BY id DESC LIMIT 1').get(p.id);
   const mode = currentVersion ? 'modify' : 'create';
 
@@ -157,20 +163,32 @@ app.post('/api/projects/:id/generate', authLib.requireAuth, async (req, res) => 
   let finalSteps = [];
   try {
     for await (const evt of runPipeline({
-      mode, message, dataset,
+      kind: projectKind, mode, message, dataset,
       currentConfig: currentVersion ? JSON.parse(currentVersion.config_json) : null,
+      currentHtml: currentVersion && currentVersion.kind === 'app' ? currentVersion.html_text : null,
     })) {
       if (evt.type === 'steps') finalSteps = evt.steps;
       if (evt.type === 'result') {
-        const r = db.prepare('INSERT INTO versions(project_id, dataset_id, config_json, engine, note) VALUES (?, ?, ?, ?, ?)')
-          .run(p.id, datasetRow.id, JSON.stringify(evt.config), evt.engine, message.slice(0, 80));
-        const versionId = Number(r.lastInsertRowid);
-        const chartCount = (evt.config.charts || []).length;
-        const summary = (mode === 'create' ? '已生成看板「' + evt.config.title + '」' : '看板已更新（' + message.slice(0, 40) + '）') + '，共 ' + chartCount + ' 个图表';
+        let versionId, summary;
+        if (evt.kind === 'app') {
+          const r = db.prepare("INSERT INTO versions(project_id, dataset_id, config_json, html_text, kind, engine, note) VALUES (?, NULL, ?, ?, 'app', ?, ?)")
+            .run(p.id, JSON.stringify({ title: evt.title, prompt: message.slice(0, 200) }), evt.html, evt.engine, message.slice(0, 80));
+          versionId = Number(r.lastInsertRowid);
+          summary = (mode === 'create' ? '已生成应用「' + evt.title + '」' : '应用已更新（' + message.slice(0, 40) + '）') + '，' + (evt.html.length / 1024).toFixed(1) + ' KB 代码';
+        } else {
+          const r = db.prepare('INSERT INTO versions(project_id, dataset_id, config_json, engine, note) VALUES (?, ?, ?, ?, ?)')
+            .run(p.id, datasetRow.id, JSON.stringify(evt.config), evt.engine, message.slice(0, 80));
+          versionId = Number(r.lastInsertRowid);
+          const chartCount = (evt.config.charts || []).length;
+          summary = (mode === 'create' ? '已生成看板「' + evt.config.title + '」' : '看板已更新（' + message.slice(0, 40) + '）') + '，共 ' + chartCount + ' 个图表';
+        }
         db.prepare('INSERT INTO messages(project_id, role, content_json) VALUES (?, ?, ?)')
           .run(p.id, 'assistant', JSON.stringify({ steps: finalSteps, summary, versionId, engine: evt.engine }));
         db.prepare("UPDATE projects SET updated_at = datetime('now','localtime') WHERE id = ?").run(p.id);
-        res.write(JSON.stringify({ type: 'result', versionId, config: evt.config, engine: evt.engine, summary }) + '\n');
+        res.write(JSON.stringify({
+          type: 'result', versionId, kind: evt.kind,
+          config: evt.config || null, engine: evt.engine, summary,
+        }) + '\n');
       } else {
         res.write(JSON.stringify(evt) + '\n');
       }
@@ -183,7 +201,10 @@ app.post('/api/projects/:id/generate', authLib.requireAuth, async (req, res) => 
 
 // ---------- preview / share ----------
 function buildPreview(versionRow) {
+  // 应用版本：HTML 直接落库，原样返回
+  if (versionRow.kind === 'app' && versionRow.html_text) return versionRow.html_text;
   const ds = db.prepare('SELECT * FROM datasets WHERE id = ?').get(versionRow.dataset_id);
+  if (!ds) return '<h3 style="font-family:sans-serif">该版本缺少数据集，无法渲染</h3>';
   const cfg = JSON.parse(versionRow.config_json);
   return renderDashboardHTML(cfg, {
     name: ds.name, columns: JSON.parse(ds.columns_json), rows: JSON.parse(ds.rows_json), rowCount: ds.row_count,
@@ -236,6 +257,30 @@ function seed() {
       engine: 'rule',
     }));
   console.log('[seed] demo 账号已创建：demo@vizgen.dev / demo1234');
+
+  // 示例二：2048 应用（通用应用模式演示）
+  const { matchTemplate } = require('./lib/templates');
+  const g = matchTemplate('做一个 2048 游戏');
+  const pr2 = db.prepare("INSERT INTO projects(user_id, name, kind) VALUES (?, ?, 'app')").run(uid, '2048 小游戏（示例）');
+  const pid2 = Number(pr2.lastInsertRowid);
+  const vr2 = db.prepare("INSERT INTO versions(project_id, dataset_id, config_json, html_text, kind, engine, note) VALUES (?, NULL, ?, ?, 'app', 'rule', ?)")
+    .run(pid2, JSON.stringify({ title: '2048', prompt: '做一个 2048 游戏' }), g.html, '做一个 2048 游戏');
+  db.prepare('INSERT INTO messages(project_id, role, content_json) VALUES (?, ?, ?)')
+    .run(pid2, 'user', JSON.stringify({ text: '做一个 2048 游戏' }));
+  db.prepare('INSERT INTO messages(project_id, role, content_json) VALUES (?, ?, ?)')
+    .run(pid2, 'assistant', JSON.stringify({
+      steps: [
+        { id: 'analyze', title: '理解应用需求', status: 'done', detail: '需求：做一个 2048 游戏' },
+        { id: 'plan', title: '设计功能与交互', status: 'done', detail: 'LLM 未配置，使用内置模板「2048 游戏」' },
+        { id: 'build', title: '生成应用代码', status: 'done', detail: '内置模板生成完成' },
+        { id: 'check', title: '校验应用完整性', status: 'done', detail: 'HTML 结构完整，包含可运行交互逻辑' },
+        { id: 'render', title: '渲染应用预览', status: 'done', detail: '自包含 HTML 应用，引擎：内置模板' },
+      ],
+      summary: '已生成应用「2048」，方向键或滑动即可开始游戏',
+      versionId: Number(vr2.lastInsertRowid),
+      engine: 'rule',
+    }));
+  console.log('[seed] 示例应用项目已创建：2048 小游戏');
 }
 
 seed();

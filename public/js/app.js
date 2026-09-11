@@ -29,10 +29,10 @@
     document.title = 'VizGen · 登录';
     app.innerHTML = `
     <div class="auth-wrap">
-      <div class="logo"><span class="logo-mark">${logoSvg()}</span>VizGen <span style="font-size:12px;color:var(--text-3);font-weight:400">看板工厂</span></div>
+      <div class="logo"><span class="logo-mark">${logoSvg()}</span>VizGen <span style="font-size:12px;color:var(--text-3);font-weight:400">AI 应用工厂</span></div>
       <div class="card auth-card fade-in">
         <h2>${mode === 'login' ? '欢迎回来' : '创建账号'}</h2>
-        <div class="sub">AI Agent 驱动的数据看板生成平台</div>
+        <div class="sub">对话生成任何 Web 应用 — 计算器、游戏、看板、工具，一句话搞定</div>
         <div class="auth-tabs">
           <button class="${mode === 'login' ? 'active' : ''}" data-m="login">登录</button>
           <button class="${mode === 'register' ? 'active' : ''}" data-m="register">注册</button>
@@ -81,18 +81,39 @@
     document.getElementById('logout').onclick = () => { API.setToken(''); location.hash = '#/login'; };
     API.get('/api/me').then(me => { document.getElementById('user-email').textContent = me.email; }).catch(() => {});
     const grid = h('<div class="proj-grid"></div>');
-    const addNew = h('<div class="card new-proj"><div class="plus">+</div><div>新建看板项目</div><div class="new-proj-form" id="np-form" style="display:none"><input class="input" id="np-name" placeholder="项目名称，如：门店销售分析" style="width:200px"><button class="btn btn-primary" id="np-create">创建</button></div></div>');
+    const addNew = h('<div class="card new-proj"><div class="plus">+</div><div>新建项目</div>' +
+      '<div class="new-proj-form" id="np-form" style="display:none;flex-direction:column;gap:10px;align-items:stretch">' +
+        '<div style="display:flex;gap:8px">' +
+          '<button class="kind-btn active" data-k="app" style="flex:1;padding:9px 6px;border-radius:10px;border:1.5px solid var(--primary);background:var(--primary-soft,#eef2ff);color:var(--primary);font-size:13px;font-weight:600">🤖 AI 应用</button>' +
+          '<button class="kind-btn" data-k="dashboard" style="flex:1;padding:9px 6px;border-radius:10px;border:1.5px solid var(--border);background:#fff;color:var(--text-2);font-size:13px;font-weight:600">📊 数据看板</button>' +
+        '</div>' +
+        '<input class="input" id="np-name" placeholder="项目名称，如：番茄钟 / 门店销售分析">' +
+        '<button class="btn btn-primary" id="np-create" style="justify-content:center">创建项目</button>' +
+      '</div></div>');
+    let newKind = 'app';
     addNew.onclick = (e) => {
-      if (e.target.id === 'np-create') return;
+      if (e.target.id === 'np-create' || e.target.classList.contains('kind-btn')) return;
       const f = addNew.querySelector('#np-form'); f.style.display = 'flex';
       addNew.querySelector('.plus').style.display = 'none';
       addNew.querySelector('div:nth-child(2)').style.display = 'none';
       addNew.querySelector('#np-name').focus();
     };
+    addNew.querySelectorAll('.kind-btn').forEach(b => b.onclick = (e) => {
+      e.stopPropagation();
+      newKind = b.dataset.k;
+      addNew.querySelectorAll('.kind-btn').forEach(x => {
+        const on = x === b;
+        x.classList.toggle('active', on);
+        x.style.borderColor = on ? 'var(--primary)' : 'var(--border)';
+        x.style.background = on ? 'var(--primary-soft,#eef2ff)' : '#fff';
+        x.style.color = on ? 'var(--primary)' : 'var(--text-2)';
+      });
+      addNew.querySelector('#np-name').placeholder = newKind === 'app' ? '项目名称，如：番茄钟 / 2048 / 记账本' : '项目名称，如：门店销售分析';
+    });
     addNew.querySelector('#np-create').onclick = async (e) => {
       e.stopPropagation();
-      const name = addNew.querySelector('#np-name').value.trim() || '未命名项目';
-      const r = await API.post('/api/projects', { name });
+      const name = addNew.querySelector('#np-name').value.trim() || (newKind === 'app' ? '新应用' : '未命名项目');
+      const r = await API.post('/api/projects', { name, kind: newKind });
       location.hash = '#/workbench/' + r.id;
     };
     addNew.querySelector('#np-name').onkeydown = (e) => { if (e.key === 'Enter') addNew.querySelector('#np-create').click(); };
@@ -102,11 +123,12 @@
     try {
       const list = await API.get('/api/projects');
       for (const p of list) {
+        const isApp = p.kind === 'app';
         const card = h(`
           <div class="card proj-card fade-in">
             <button class="proj-del" title="删除">✕</button>
             <h3>${esc(p.name)}</h3>
-            <div class="proj-meta"><span>${p.version_count} 个版本</span><span>更新于 ${timeAgo(p.updated_at)}</span></div>
+            <div class="proj-meta"><span>${isApp ? '🤖 AI 应用' : '📊 数据看板'}</span><span>${p.version_count} 个版本</span><span>更新于 ${timeAgo(p.updated_at)}</span></div>
           </div>`);
         card.onclick = () => { location.hash = '#/workbench/' + p.id; };
         card.querySelector('.proj-del').onclick = async (e) => {
@@ -129,6 +151,8 @@
     try { data = await API.get('/api/projects/' + id); }
     catch (e) { toast(e.message); location.hash = '#/projects'; return; }
     state.project = data;
+    state.kind = data.kind === 'app' ? 'app' : 'dashboard';
+    const isApp = state.kind === 'app';
     state.versionId = data.latestVersionId || null;
     document.title = 'VizGen · ' + data.project.name;
 
@@ -138,17 +162,18 @@
           <a href="#/projects" style="color:var(--text-2);font-size:13px">‹ 我的项目</a>
           <span class="logo-mark" style="width:26px;height:26px;border-radius:6px">${logoSvg()}</span>
           <span class="proj-name">${esc(data.project.name)}</span>
+          <span class="badge ${isApp ? 'badge-llm' : 'badge-rule'}">${isApp ? '🤖 AI 应用' : '📊 数据看板'}</span>
           <span class="spacer"></span>
-          <button class="btn btn-ghost" id="share-btn" ${data.latestVersionId ? '' : 'disabled'}>分享看板</button>
+          <button class="btn btn-ghost" id="share-btn" ${data.latestVersionId ? '' : 'disabled'}>${isApp ? '分享应用' : '分享看板'}</button>
           <button class="btn btn-ghost" id="wb-logout">退出</button>
         </div>
         <div class="wb-body">
           <div class="chat">
-            <div class="chat-head"><span class="spinner" style="width:10px;height:10px;border-width:1.5px"></span>Agent 就绪，描述你的看板需求</div>
+            <div class="chat-head"><span class="spinner" style="width:10px;height:10px;border-width:1.5px"></span>${isApp ? 'Agent 就绪，描述你想生成的应用' : 'Agent 就绪，描述你的看板需求'}</div>
             <div class="chat-msgs" id="chat-msgs"></div>
             <div class="suggest" id="suggest"></div>
             <div class="chat-input">
-              <textarea id="chat-text" placeholder="例如：生成一个销售看板，重点看区域对比"></textarea>
+              <textarea id="chat-text" placeholder="${isApp ? '例如：做一个番茄钟，25 分钟专注 + 5 分钟休息' : '例如：生成一个销售看板，重点看区域对比'}"></textarea>
               <button class="send-btn" id="send-btn" title="发送"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/></svg></button>
             </div>
           </div>
@@ -166,7 +191,7 @@
     renderPreviewPane();
     wireChatInput();
 
-    if (!data.dataset) renderSetup();
+    if (!isApp && !data.dataset) renderSetup();
     else renderPreview();
   }
 
@@ -218,14 +243,15 @@
   // ----- 预览区（tabs）-----
   function renderPreviewPane() {
     const pane = document.getElementById('preview-pane');
-    if (!state.project.dataset) { pane.innerHTML = ''; return; }
+    const isApp = state.kind === 'app';
+    if (!isApp && !state.project.dataset) { pane.innerHTML = ''; return; }
     const versions = state.project.versions;
     pane.innerHTML = `
       <div class="pv-toolbar">
         <div class="tabs">
           <button data-tab="preview" class="${state.tab === 'preview' ? 'active' : ''}">预览</button>
           <button data-tab="code" class="${state.tab === 'code' ? 'active' : ''}">代码</button>
-          <button data-tab="config" class="${state.tab === 'config' ? 'active' : ''}">配置</button>
+          ${isApp ? '' : '<button data-tab="config" class="' + (state.tab === 'config' ? 'active' : '') + '">配置</button>'}
         </div>
         <div class="seg" id="device-seg">
           <button data-d="desktop" class="${state.device === 'desktop' ? 'active' : ''}">桌面</button>
@@ -241,14 +267,17 @@
     pane.querySelector('#ver-select').onchange = (e) => { state.versionId = Number(e.target.value); renderPreview(); };
     pane.querySelector('#open-new').onclick = () => { if (state.versionId) window.open('/api/versions/' + state.versionId + '/preview'); };
     if (!versions.length) state.versionId = null;
+    if (state.tab === 'config' && isApp) state.tab = 'preview';
   }
 
   async function renderPreview() {
     const c = document.getElementById('pv-content');
     if (!c) return;
-    const d = state.project.dataset;
+    const isApp = state.kind === 'app';
     if (!state.versionId) {
-      c.innerHTML = '<div class="pv-empty"><div class="big" style="font-size:40px;opacity:.4">📊</div><div>还没有看板，在左侧描述你的需求，Agent 会即时生成</div></div>';
+      c.innerHTML = isApp
+        ? '<div class="pv-empty"><div class="big" style="font-size:40px;opacity:.4">🤖</div><div>还没有应用，在左侧描述你的想法，Agent 会即时生成<br><span style="font-size:12px;color:var(--text-3)">试试：计算器、2048 游戏、待办清单、番茄钟、记事本、记账本…</span></div></div>'
+        : '<div class="pv-empty"><div class="big" style="font-size:40px;opacity:.4">📊</div><div>还没有看板，在左侧描述你的需求，Agent 会即时生成</div></div>';
       return;
     }
     if (state.tab === 'preview') {
@@ -296,7 +325,7 @@
       else addAgentMessage(m, box);
     }
     box.scrollTop = box.scrollHeight;
-    renderSuggest(!!data.dataset);
+    renderSuggest(state.kind === 'app' || !!data.dataset);
   }
 
   function stepIcon(st) {
@@ -341,16 +370,24 @@
     return '<span class="step-ico run" style="margin:0"><span class="spinner"></span></span>';
   }
 
-  function renderSuggest(hasDataset) {
+  function renderSuggest(ready) {
     const el = document.getElementById('suggest');
-    const items = hasDataset && !state.project.versions.length
-      ? ['生成一个数据看板', '重点看销售额趋势和区域对比', '加一个占比分析饼图']
-      : hasDataset
-        ? ['把柱状图换成折线图', '标题改成「销售业绩总览」', '删除饼图，加一个KPI指标卡']
-        : ['（导入数据后可开始对话）'];
+    const isApp = state.kind === 'app';
+    let items;
+    if (isApp) {
+      items = !state.project.versions.length
+        ? ['做一个计算器', '做一个 2048 游戏', '做一个番茄钟，25分钟专注+5分钟休息']
+        : ['把配色改成深色主题', '加一个统计功能，显示已完成数量', '界面改成移动端优先的布局'];
+    } else if (ready && !state.project.versions.length) {
+      items = ['生成一个数据看板', '重点看销售额趋势和区域对比', '加一个占比分析饼图'];
+    } else if (ready) {
+      items = ['把柱状图换成折线图', '标题改成「销售业绩总览」', '删除饼图，加一个KPI指标卡'];
+    } else {
+      items = ['（导入数据后可开始对话）'];
+    }
     el.innerHTML = items.map(t => '<button>' + esc(t) + '</button>').join('');
     el.querySelectorAll('button').forEach(b => b.onclick = () => {
-      if (!hasDataset) { toast('请先导入数据'); return; }
+      if (!ready) { toast('请先导入数据'); return; }
       document.getElementById('chat-text').value = b.textContent;
       document.getElementById('send-btn').click();
     });
@@ -369,7 +406,7 @@
   let busy = false;
   async function sendMessage(text) {
     if (!text || busy) return;
-    if (!state.project.dataset) { toast('请先导入数据'); return; }
+    if (state.kind !== 'app' && !state.project.dataset) { toast('请先导入数据'); return; }
     busy = true;
     const btn = document.getElementById('send-btn');
     btn.disabled = true;

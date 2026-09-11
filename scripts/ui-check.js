@@ -49,6 +49,20 @@ const SHOT_DIR = path.join(__dirname, '..', 'shots');
   console.log('[4] 代码视图 OK');
   await page.screenshot({ path: path.join(SHOT_DIR, '3-code.png') });
 
+  // 5. V2：新建 AI 应用项目并生成（LLM 失败时自动降级内置模板，两种结果都算通过）
+  await page.goto(BASE + '/#/projects', { waitUntil: 'networkidle' });
+  await page.click('.new-proj');
+  await page.fill('#np-name', '冒烟-2048');
+  await page.click('#np-create');
+  await page.waitForURL('**/workbench/**', { timeout: 10000 });
+  await page.waitForTimeout(800);
+  await page.fill('#chat-text', '做一个2048游戏');
+  await page.click('#send-btn');
+  await page.waitForSelector('#pv-frame', { timeout: 150000 });
+  await page.waitForTimeout(1500);
+  console.log('[5] V2 应用生成 + 预览 OK');
+  await page.screenshot({ path: path.join(SHOT_DIR, '4-app.png') });
+
   await browser.close();
   if (errors.length) {
     console.log('\n发现前端错误:');

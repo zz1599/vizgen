@@ -284,7 +284,9 @@
       c.innerHTML = '<div class="pv-stage"><div class="pv-frame-wrap ' + (state.device === 'mobile' ? 'mobile' : '') + '"><iframe class="pv-frame" id="pv-frame"></iframe></div></div>';
       try {
         const html = await API.previewText(state.versionId);
-        document.getElementById('pv-frame').srcdoc = html;
+        const f = document.getElementById('pv-frame');
+        f.onload = () => { try { f.contentWindow.scrollTo(0, 0); } catch (e) { /* 跨域时忽略 */ } };
+        f.srcdoc = html;
       } catch (e) { toast('预览加载失败：' + e.message); }
     } else if (state.tab === 'code') {
       c.innerHTML = '<div class="code-view"><pre>加载中…</pre></div>';
@@ -377,7 +379,7 @@
     if (isApp) {
       items = !state.project.versions.length
         ? ['做一个计算器', '做一个 2048 游戏', '做一个番茄钟，25分钟专注+5分钟休息']
-        : ['把配色改成深色主题', '加一个统计功能，显示已完成数量', '界面改成移动端优先的布局'];
+        : ['把配色改成深色主题', '让界面完整显示在一屏内，不要被裁剪', '加一个统计功能，显示已完成数量'];
     } else if (ready && !state.project.versions.length) {
       items = ['生成一个数据看板', '重点看销售额趋势和区域对比', '加一个占比分析饼图'];
     } else if (ready) {

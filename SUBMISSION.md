@@ -4,7 +4,7 @@
 
 - 在线体验：`<填写部署后链接>`
 - 演示账号：`demo@vizgen.dev` / `demo1234`（已预置成品看板，打开即可看效果）
-- 源码：`<填写 GitHub 链接>`
+- 源码：**https://github.com/zz1599/vizgen**（Public）
 - 本地运行：`npm install && npm start`（Node 18+，详见 README.md）
 
 ## 1. 实现思路与关键取舍

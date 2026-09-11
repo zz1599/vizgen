@@ -3,7 +3,7 @@
 > 一句话：**VizGen 是一个 AI Agent 驱动的通用应用生成平台（AI vibe coding 工厂）** —— 用户用自然语言描述想要的 Web 应用（计算器、2048 游戏、番茄钟、数据看板……），Agent 流水线自动生成一个可交互、可分享的网页应用，并在对话式工作台中实时预览与迭代。
 
 - 在线体验：**https://vizgen.onrender.com**（Render 免费实例，15 分钟无访问会休眠，首次打开约需 30-60 秒唤醒）
-- 演示账号：`demo@vizgen.dev` / `demo1234`（已预置销售看板与 2048 小游戏两个示例项目）
+- 演示账号：`demo@vizgen.dev` / `demo1234`（已预置 1 个销售看板 + 5 个应用示例：2048 / 计算器 / 番茄钟 / 待办清单 / 记事本）
 - 源码：**https://github.com/zz1599/vizgen**（Public）
 - 本地运行：`npm install && npm start`（Node 18+，详见 README.md）
 

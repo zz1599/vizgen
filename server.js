@@ -258,29 +258,38 @@ function seed() {
     }));
   console.log('[seed] demo 账号已创建：demo@vizgen.dev / demo1234');
 
-  // 示例二：2048 应用（通用应用模式演示）
+  // 示例应用项目（通用应用模式演示，全部来自内置模板，零 LLM 消耗）
   const { matchTemplate } = require('./lib/templates');
-  const g = matchTemplate('做一个 2048 游戏');
-  const pr2 = db.prepare("INSERT INTO projects(user_id, name, kind) VALUES (?, ?, 'app')").run(uid, '2048 小游戏（示例）');
-  const pid2 = Number(pr2.lastInsertRowid);
-  const vr2 = db.prepare("INSERT INTO versions(project_id, dataset_id, config_json, html_text, kind, engine, note) VALUES (?, NULL, ?, ?, 'app', 'rule', ?)")
-    .run(pid2, JSON.stringify({ title: '2048', prompt: '做一个 2048 游戏' }), g.html, '做一个 2048 游戏');
-  db.prepare('INSERT INTO messages(project_id, role, content_json) VALUES (?, ?, ?)')
-    .run(pid2, 'user', JSON.stringify({ text: '做一个 2048 游戏' }));
-  db.prepare('INSERT INTO messages(project_id, role, content_json) VALUES (?, ?, ?)')
-    .run(pid2, 'assistant', JSON.stringify({
-      steps: [
-        { id: 'analyze', title: '理解应用需求', status: 'done', detail: '需求：做一个 2048 游戏' },
-        { id: 'plan', title: '设计功能与交互', status: 'done', detail: 'LLM 未配置，使用内置模板「2048 游戏」' },
-        { id: 'build', title: '生成应用代码', status: 'done', detail: '内置模板生成完成' },
-        { id: 'check', title: '校验应用完整性', status: 'done', detail: 'HTML 结构完整，包含可运行交互逻辑' },
-        { id: 'render', title: '渲染应用预览', status: 'done', detail: '自包含 HTML 应用，引擎：内置模板' },
-      ],
-      summary: '已生成应用「2048」，方向键或滑动即可开始游戏',
-      versionId: Number(vr2.lastInsertRowid),
-      engine: 'rule',
-    }));
-  console.log('[seed] 示例应用项目已创建：2048 小游戏');
+  const APP_SAMPLES = [
+    { name: '2048 小游戏（示例）', prompt: '做一个 2048 游戏' },
+    { name: '计算器（示例）', prompt: '做一个计算器，支持加减乘除和键盘输入' },
+    { name: '番茄钟（示例）', prompt: '做一个番茄钟，25 分钟专注 + 5 分钟休息' },
+    { name: '待办清单（示例）', prompt: '做一个待办清单，可以勾选完成和删除' },
+    { name: '记事本（示例）', prompt: '做一个记事本，支持多笔记与自动保存' },
+  ];
+  for (const s of APP_SAMPLES) {
+    const g = matchTemplate(s.prompt);
+    const pr2 = db.prepare("INSERT INTO projects(user_id, name, kind) VALUES (?, ?, 'app')").run(uid, s.name);
+    const pid2 = Number(pr2.lastInsertRowid);
+    const vr2 = db.prepare("INSERT INTO versions(project_id, dataset_id, config_json, html_text, kind, engine, note) VALUES (?, NULL, ?, ?, 'app', 'rule', ?)")
+      .run(pid2, JSON.stringify({ title: g.name, prompt: s.prompt }), g.html, s.prompt);
+    db.prepare('INSERT INTO messages(project_id, role, content_json) VALUES (?, ?, ?)')
+      .run(pid2, 'user', JSON.stringify({ text: s.prompt }));
+    db.prepare('INSERT INTO messages(project_id, role, content_json) VALUES (?, ?, ?)')
+      .run(pid2, 'assistant', JSON.stringify({
+        steps: [
+          { id: 'analyze', title: '理解应用需求', status: 'done', detail: '需求：' + s.prompt },
+          { id: 'plan', title: '设计功能与交互', status: 'done', detail: 'LLM 未配置，使用内置模板「' + g.name + '」' },
+          { id: 'build', title: '生成应用代码', status: 'done', detail: '内置模板生成完成' },
+          { id: 'check', title: '校验应用完整性', status: 'done', detail: 'HTML 结构完整，包含可运行交互逻辑' },
+          { id: 'render', title: '渲染应用预览', status: 'done', detail: '自包含 HTML 应用，引擎：内置模板' },
+        ],
+        summary: '已生成应用「' + g.name + '」，可直接预览与对话迭代',
+        versionId: Number(vr2.lastInsertRowid),
+        engine: 'rule',
+      }));
+  }
+  console.log('[seed] ' + APP_SAMPLES.length + ' 个示例应用项目已创建');
 }
 
 seed();

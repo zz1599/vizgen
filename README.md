@@ -11,7 +11,7 @@ VizGen 是一个具备 [Atoms](https://atoms.dev/) 类能力的 AI vibe coding �
 
 - 平台地址：**https://vizgen.onrender.com**（Render 免费实例：15 分钟无访问会休眠，首次打开约需 30-60 秒唤醒；重新部署后 SQLite 数据重置，演示账号与示例项目会自动重新播种）
 - 源码仓库：**https://github.com/zz1599/vizgen**
-- 演示账号：`demo@vizgen.dev` / `demo1234`（已预置销售看板与 2048 小游戏两个示例项目）
+- 演示账号：`demo@vizgen.dev` / `demo1234`（已预置 1 个销售看板 + 5 个应用示例：2048 / 计算器 / 番茄钟 / 待办清单 / 记事本）
 - 分享链接示例：平台内点击「分享应用 / 分享看板」生成 `/s/<版本ID>` 公开链接
 
 ## 核心功能

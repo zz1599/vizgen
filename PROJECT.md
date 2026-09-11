@@ -2,7 +2,7 @@
 
 > 一句话：**VizGen 是一个 AI Agent 驱动的数据看板生成平台** —— 用户上传 CSV 并用自然语言描述需求，Agent 流水线自动生成一个可交互、可分享的数据看板网页应用，并在对话式工作台中实时预览与迭代。
 
-- 在线体验：`<填写部署后链接>`
+- 在线体验：**https://vizgen.onrender.com**（Render 免费实例，15 分钟无访问会休眠，首次打开约需 30-60 秒唤醒）
 - 演示账号：`demo@vizgen.dev` / `demo1234`（已预置成品看板，打开即可看效果）
 - 源码：**https://github.com/zz1599/vizgen**（Public）
 - 本地运行：`npm install && npm start`（Node 18+，详见 README.md）

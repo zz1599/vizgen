@@ -6,7 +6,7 @@ VizGen 是一个类似 [Atoms](https://atoms.dev/) 能力的垂直化 AI 应用�
 
 ## 在线体验
 
-- 平台地址：**https://e652c870f6df42de82948001404991fa.app.workbuddy.link**
+- 平台地址：**https://vizgen.onrender.com**（Render 免费实例：15 分钟无访问会休眠，首次打开约需 30-60 秒唤醒；重新部署后 SQLite 数据重置，演示账号与示例看板会自动重新播种）
 - 源码仓库：**https://github.com/zz1599/vizgen**
 - 演示账号：`demo@vizgen.dev` / `demo1234`（已预置一个生成完成的销售看板项目）
 - 分享链接示例：平台内点击「分享看板」生成 `/s/<版本ID>` 公开链接

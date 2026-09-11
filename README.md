@@ -49,14 +49,18 @@ npm install
 npm start          # 默认 http://localhost:3000
 ```
 
-可选：配置 LLM 通道（不配置则自动使用规则引擎，功能完整可演示）
+可选：配置 LLM 通道（**推荐**，不配置则自动使用规则引擎，功能完整可演示）
 
 ```bash
-# .env 或环境变量（OpenAI 兼容接口，DeepSeek/GLM/通义均可）
+# 方式一：项目根目录新建 .env（服务启动时自动加载，已在 .gitignore 中）
 LLM_API_KEY=sk-xxxx
 LLM_BASE_URL=https://api.deepseek.com
 LLM_MODEL=deepseek-chat
+
+# 方式二：直接设置同名环境变量（部署平台推荐，如 Vercel / Render 的控制台）
 ```
+
+已用 DeepSeek `deepseek-chat` 实测：生成与修改请求均由 LLM 规划，UI 上显示「LLM 规划」徽章；Key 无效或调用失败时自动降级到规则引擎，不会中断演示。
 
 UI 冒烟检查（需本机装有 Edge）：
 
@@ -64,12 +68,27 @@ UI 冒烟检查（需本机装有 Edge）：
 node scripts/ui-check.js
 ```
 
+受限网络下推送代码到 GitHub（`github.com:443` 被阻断时）：
+
+```bash
+# 走 GitHub 官方 SSH 备用通道（ssh.github.com:443）
+# 1) 生成密钥并把 ~/.ssh/id_ed25519.pub 加到 https://github.com/settings/keys
+ssh-keygen -t ed25519 -N "" -C "vizgen-push" -f ~/.ssh/id_ed25519
+# 2) 配置 ssh 走 443 端口
+printf 'Host github.com\n  HostName ssh.github.com\n  Port 443\n  User git\n  IdentityFile ~/.ssh/id_ed25519\n  StrictHostKeyChecking accept-new\n' > ~/.ssh/config
+# 3) 使用 SSH 远程地址推送
+git remote set-url origin git@github.com:<你的用户名>/vizgen.git && git push -u origin main
+
+# 备选：仅 api.github.com 可达时，用 REST API 逐文件上传（需 PAT）
+GITHUB_TOKEN=ghp_xxx node scripts/api-push.js <owner> <repo>
+```
+
 ## 技术栈
 
 - **后端**：Node.js 22 + Express + node:sqlite（零原生编译依赖）
 - **前端**：原生 SPA（无框架、无构建步骤），设计系统手写 CSS
 - **生成应用**：自包含单文件 HTML，ECharts（CDN）渲染，内置维度筛选与响应式布局
-- **AI**：OpenAI 兼容 Chat API（JSON 模式），可选
+- **AI**：OpenAI 兼容 Chat API（JSON 模式），已用 DeepSeek `deepseek-chat` 实测通过；未配置或调用失败时降级到内置规则引擎
 
 ## 项目结构
 
@@ -88,6 +107,9 @@ vizgen/
 │   ├── index.html
 │   ├── css/style.css
 │   └── js/              # api.js / app.js / sample.js
-├── scripts/ui-check.js  # 无头浏览器 UI 冒烟检查
-└── DESIGN.md            # 设计决策与取舍说明
+├── scripts/             # ui-check.js（UI 冒烟） / api-push.js（受限网络下经 API 推送）
+├── shots/               # UI 截图
+├── README.md            # 项目说明
+├── DESIGN.md            # 设计决策与取舍（含线上问题定位记录）
+└── SUBMISSION.md        # 笔试提交说明（实现思路 / 完成程度 / 扩展计划）
 ```
